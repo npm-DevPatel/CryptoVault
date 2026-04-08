@@ -1,0 +1,1400 @@
+<!-- 
+  ╔══════════════════════════════════════════════════════════════════════════════╗
+  ║               CREDIT CARD VAULT — ENCRYPTION DEMONSTRATION                    ║
+  ║                                                                                ║
+  ║  A complete education demo showing how to securely store encrypted credit     ║
+  ║  card data and hash passwords using modern cryptography (Web Crypto API).      ║
+  ║                                                                                ║
+  ║  Key Features:                                                                 ║
+  ║  • AES-256-GCM encryption for sensitive card fields (card number, CVV, exp)   ║
+  ║  • Bcrypt-style password hashing using PBKDF2 with cost factors               ║
+  ║  • Application-layer encryption (data encrypted BEFORE reaching the database)  ║
+  ║  • Interactive pipeline visualization showing every step of encryption        ║
+  ║  • Simulated MySQL database with encrypted records                            ║
+  ║  • Full decryption capability to demonstrate reversibility                     ║
+  ║                                                                                ║
+  ║  Security Principles Demonstrated:                                            ║
+  ║  1. Separation of concerns (encryption key lives on app server, never in DB)  ║
+  ║  2. Randomized IVs (unique per field prevents pattern attacks)                ║
+  ║  3. Authenticated encryption (AES-GCM detects tampering)                      ║
+  ║  4. One-way hashing for passwords (irreversible, cannot be decrypted)         ║
+  ║  5. Slow hashing (intentionally computationally expensive to resist attacks)  ║
+  ║                                                                                ║
+  ║  Author: APT3090 Cryptography Project                                         ║
+  ║  Date: 2024                                                                    ║
+  ╚══════════════════════════════════════════════════════════════════════════════╝
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Character encoding declaration: UTF-8 for proper character rendering across all browsers -->
+<meta charset="UTF-8">
+<!-- Viewport meta tag: Makes the page responsive on mobile devices (width matches device, initial zoom 100%) -->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Page title displayed in browser tab and search results -->
+<title>Credit Card Vault — Encryption Demo</title>
+<!-- Google Fonts import: Two professional fonts for the demo
+     1. JetBrains Mono: Monospace font for displaying code, cryptographic outputs, and technical data
+     2. DM Sans: Clean sans-serif font for UI labels, buttons, and body text -->
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ═════════════════════════════════════════════════════════════════════════════════ */
+/* CSS CUSTOM PROPERTIES (CSS Variables) — Color Scheme & Typography                 */
+/* ═════════════════════════════════════════════════════════════════════════════════ */
+:root{
+  /* Background colors */
+  --bg:#f4f6fb;                    /* Main page background: light blue-gray */
+  --surface:#ffffff;               /* Primary surface color: white cards and panels */
+  --surface2:#f0f4ff;              /* Secondary surface: slightly tinted light background */
+  
+  /* Border colors (used for grid lines, card outlines) */
+  --border:#e2e8f0;                /* Primary border: light gray-blue */
+  --border2:#cbd5e1;               /* Secondary border: slightly darker gray-blue */
+  
+  /* Accent colors (primary UI brand color) */
+  --accent:#4f46e5;                /* Main accent: indigo-purple (primary buttons, active states) */
+  --accent-light:#eef2ff;          /* Light tinted accent: used for highlights and badge backgrounds */
+  
+  /* Status colors (semantic meaning) */
+  --green:#059669;                 /* Success/verified state: solid teal-green */
+  --green-light:#ecfdf5;           /* Success background: very light green tint */
+  --red:#dc2626;                   /* Error/encrypted state: bright red */
+  --red-light:#fef2f2;             /* Error background: very light red tint */
+  --amber:#d97706;                 /* Warning state: orange-amber (for caution indicators) */
+  --amber-light:#fffbeb;           /* Warning background: very light amber tint */
+  
+  /* Text colors (hierarchy) */
+  --text:#0f172a;                  /* Primary text: dark navy-blue (body copy) */
+  --text2:#475569;                 /* Secondary text: medium gray-blue (labels, descriptions) */
+  --text3:#94a3b8;                 /* Tertiary text: light gray-blue (muted, placeholder text) */
+  
+  /* Typography */
+  --mono:'JetBrains Mono',monospace;  /* Monospace font: for code, keys, encrypted output */
+  --sans:'DM Sans',sans-serif;        /* Sans-serif font: for all UI and readable text */
+  
+  /* Shape and shadow */
+  --radius:12px;                   /* Border radius: consistent rounded corners across UI */
+  --shadow:0 1px 3px rgba(0,0,0,.07),0 4px 16px rgba(0,0,0,.05);  /* Subtle elevation shadows */
+}
+/* GLOBAL BASE STYLES */
+/* Reset default margins/padding and apply box-sizing to all elements */
+*{box-sizing:border-box;margin:0;padding:0}
+
+/* Body background and typography defaults */
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.6;min-height:100vh}
+/* ═══════════════ NAVIGATION BAR STYLES ═══════════════ */
+/* Sticky navigation header that stays at top when scrolling */
+nav{
+  background:var(--surface);                  /* White background */
+  border-bottom:1px solid var(--border);      /* Subtle bottom border */
+  padding:14px 32px;                          /* Horizontal padding for content spacing */
+  display:flex;align-items:center;gap:12px;   /* Flex layout: items centered vertically, 12px spacing */
+  position:sticky;                            /* Sticks to top during scroll */
+  top:0;z-index:100;                          /* Highest z-level to appear above all other content */
+  box-shadow:0 1px 8px rgba(0,0,0,.06);       /* Subtle drop shadow for depth */
+}
+
+/* Lock/vault icon in navigation (colored box with icon inside) */
+.nav-icon{
+  width:32px;height:32px;
+  background:var(--accent);                   /* Indigo purple background */
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;  /* Center the SVG icon */
+}
+
+/* Main site title in navigation */
+nav h1{font-size:16px;font-weight:600;letter-spacing:-.2px}
+
+/* Subtitle text next to main title (small gray text) */
+nav small{color:var(--text3);font-size:12px;margin-left:2px}
+
+/* Badge showing main algorithms used (right side of nav) */
+.nav-badge{
+  margin-left:auto;                           /* Push to right end of nav */
+  background:var(--accent-light);             /* Light purple background */
+  color:var(--accent);                        /* Indigo text */
+  font-size:11px;font-family:var(--mono);     /* Monospace for tech specs */
+  padding:4px 10px;border-radius:20px;        /* Pill-shaped badge */
+  border:1px solid #c7d2fe;                   /* Subtle purple border */
+  letter-spacing:.3px;                        /* Slight spacing between characters */
+}
+/* ═══════════════ LAYOUT CONTAINER ═══════════════ */
+/* Main content wrapper: max-width for readability, centered with auto margins */
+.container{
+  max-width:1020px;                           /* Standard readable column width */
+  margin:0 auto;                              /* Center horizontally */
+  padding:36px 24px;                          /* Vertical and horizontal padding */
+}
+/* ═══════════════ SECTION HEADING STYLES ═══════════════ */
+/* Small uppercase label ("Phase 2 — Core Demo", etc.) */
+.sec-label{font-size:11px;font-family:var(--mono);color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px}
+
+/* Main section title heading */
+.sec-title{font-size:22px;font-weight:600;letter-spacing:-.4px;margin-bottom:6px}
+
+/* Section description/subtitle text */
+.sec-sub{font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:28px;max-width:640px}
+/* ═══════════════ CARD COMPONENT ═══════════════ */
+/* Reusable card container with subtle shadow and border */
+.card{
+  background:var(--surface);
+  border:1px solid var(--border);             /* Subtle border */
+  border-radius:var(--radius);                /* Rounded corners */
+  box-shadow:var(--shadow);                   /* Elevation shadow */
+  padding:24px;                               /* Internal padding */
+  margin-bottom:20px;                         /* Space between cards */
+}
+/* ═══════════════ FORM & INPUT STYLES ═══════════════ */
+/* Numbered badge shown next to each step in the encryption pipeline */
+.step-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:26px;height:26px;border-radius:50%;      /* Perfect circle */
+  background:var(--accent);color:#fff;           /* White text on accent background */
+  font-size:12px;font-weight:600;flex-shrink:0;   /* Non-shrinkable in flex layouts */
+}
+
+/* Two-column grid for form fields */
+.form-row{
+  display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+
+/* Individual form field container (label + input) */
+.field{display:flex;flex-direction:column;gap:6px}
+
+/* Make a form field span both columns */
+.field.full{grid-column:1/-1}
+
+/* Form field label styling */
+label{
+  font-size:12px;font-weight:500;color:var(--text2);
+  text-transform:uppercase;                   /* All caps */
+  letter-spacing:.7px;                        /* Spaced out */
+  font-family:var(--mono);                    /* Monospace for technical labels */
+}
+
+/* Text input field styling */
+input{
+  background:var(--surface2);                 /* Light background */
+  border:1px solid var(--border2);            /* Subtle border */
+  border-radius:8px;padding:11px 13px;
+  color:var(--text);font-family:var(--mono);font-size:14px;
+  outline:none;transition:border-color .2s,box-shadow .2s;  /* Smooth transitions */
+  width:100%;                                 /* Full width of parent */
+}
+
+/* Input focus state: highlight border and add glow effect */
+input:focus{
+  border-color:var(--accent);                 /* Accent-colored border on focus */
+  box-shadow:0 0 0 3px rgba(79,70,229,.1);    /* Subtle purple glow */
+}
+/* ═══════════════ BUTTON STYLES ═══════════════ */
+/* Base button styling */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  gap:8px;padding:11px 22px;border:none;border-radius:8px;
+  font-family:var(--sans);font-size:14px;font-weight:500;
+  cursor:pointer;transition:all .18s;         /* Smooth all property transitions */
+}
+
+/* Primary button (main action buttons) */
+.btn-primary{
+  background:var(--accent);color:#fff;        /* White text on accent background */
+  width:100%;                                 /* Full width */
+  font-size:15px;padding:13px;
+}
+
+/* Primary button hover state */
+.btn-primary:hover{
+  background:#4338ca;                         /* Slightly darker shade */
+  transform:translateY(-1px);                 /* Lift up effect */
+  box-shadow:0 4px 12px rgba(79,70,229,.3);   /* Larger shadow on hover */
+}
+
+/* Primary button active/pressed state */
+.btn-primary:active{transform:translateY(0)}  /* Return to normal position */
+
+/* Disabled primary button */
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+
+/* Small button variant (secondary actions) */
+.btn-sm{
+  padding:7px 14px;font-size:13px;
+  background:var(--accent-light);color:var(--accent);  /* Light purple styling */
+  border:1px solid #c7d2fe;border-radius:7px;
+  cursor:pointer;font-family:var(--sans);transition:all .15s;
+}
+
+/* Small button hover: darker background */
+.btn-sm:hover{background:#e0e7ff}
+/* ═══════════════ PIPELINE VISUALIZATION ═══════════════ */
+/* Encryption pipeline container - vertical list of steps */
+.pipeline{display:flex;flex-direction:column;gap:0;margin:20px 0}
+
+/* Individual step in the pipeline */
+.pipe-step{
+  display:flex;gap:0;align-items:stretch;
+  opacity:.35;                                /* Dimmed by default (not active) */
+  transition:opacity .4s;                     /* Smooth fade transition */
+}
+
+/* Step that is currently active/processing */
+.pipe-step.active{opacity:1}
+
+/* Step that has been completed */
+.pipe-step.done{opacity:.85}                 /* Slightly dimmed but still visible */
+
+/* Left column: the dot and vertical line connector */
+.pipe-left{
+  display:flex;flex-direction:column;align-items:center;
+  width:40px;flex-shrink:0;                   /* Fixed width, doesn't shrink */
+}
+
+/* Dot indicator on the left of each step */
+.pipe-dot{
+  width:14px;height:14px;border-radius:50%;   /* Perfect circle */
+  background:var(--border2);                  /* Default: gray color */
+  border:2px solid var(--surface);            /* White border to stand out */
+  box-shadow:0 0 0 2px var(--border2);        /* Double outline effect */
+  transition:all .3s;flex-shrink:0;           /* Non-shrinkable */
+  margin-top:4px;                             /* Slight offset from top */
+}
+
+/* Active step dot: change to accent color with glow */
+.pipe-step.active .pipe-dot{
+  background:var(--accent);                   /* Indigo purple */
+  box-shadow:0 0 0 3px rgba(79,70,229,.2);    /* Purple-tinted glow */
+}
+
+/* Completed step dot: change to green with glow */
+.pipe-step.done .pipe-dot{
+  background:var(--green);                    /* Green checkmark color */
+  box-shadow:0 0 0 3px rgba(5,150,105,.2);    /* Green-tinted glow */
+}
+
+/* Vertical line connecting steps */
+.pipe-line{
+  flex:1;width:2px;background:var(--border); /* Thin gray line */
+  margin:4px 0;min-height:20px;               /* Minimum height between dots */
+}
+
+/* Green the line when step is done */
+.pipe-step.done .pipe-line{background:var(--green);opacity:.4}
+
+/* Right column: step content (title, description, box) */
+.pipe-content{flex:1;padding:0 0 28px 16px}  /* Space below for next step */
+
+/* Step title with badge number and description */
+.pipe-title{font-size:14px;font-weight:600;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+
+/* Step description text (gray, smaller) */
+.pipe-desc{font-size:13px;color:var(--text2);margin-bottom:10px;line-height:1.6}
+
+/* Step content box (displays actual data/output) */
+.pipe-box{
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+  padding:12px 14px;font-family:var(--mono);font-size:12px;
+  word-break:break-all;line-height:1.8;min-height:44px;  /* Monospace for code display */
+  transition:all .3s;                         /* Smooth color transitions */
+}
+
+/* Highlighted box (shows important input data) */
+.pipe-box.hl{border-color:var(--accent);background:var(--accent-light)}
+
+/* Encrypted box (shows unreadable ciphertext) */
+.pipe-box.enc{border-color:var(--red);background:var(--red-light);color:#991b1b}
+
+/* OK/verified box (shows decryption successful) */
+.pipe-box.ok{border-color:var(--green);background:var(--green-light);color:#065f46}
+/* ═══════════════ TAGS & BADGES ═══════════════ */
+/* Tag labels for categorizing data (PLAINTEXT, KEY, IV, CIPHER, STORED, etc.) */
+.tag{
+  display:inline-block;font-size:10px;font-family:var(--mono);
+  padding:2px 7px;border-radius:4px;font-weight:600;
+  letter-spacing:.5px;margin-bottom:6px;     /* Small margin for text wrapping */
+}
+
+/* Tag color: plain text (yellow) */
+.t-plain{background:#fef3c7;color:#92400e}
+
+/* Tag color: encryption key (purple) */
+.t-key{background:#ede9fe;color:#5b21b6}
+
+/* Tag color: initialization vector (light blue) */
+.t-iv{background:#e0f2fe;color:#075985}
+
+/* Tag color: ciphertext/encrypted (red) */
+.t-cipher{background:#fee2e2;color:#991b1b}
+
+/* Tag color: stored/verified (green) */
+.t-stored{background:#d1fae5;color:#065f46}
+
+/* Status chip - small badge showing current operation status */
+.chip{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:20px;       /* Pill-shaped */
+  font-size:12px;font-weight:500;
+}
+
+/* Chip state: idle/waiting */
+.chip-idle{background:var(--surface2);color:var(--text3);border:1px solid var(--border)}
+
+/* Chip state: running/processing (with pulsing dot) */
+.chip-run{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+
+/* Chip state: done/completed (with checkmark) */
+.chip-done{background:var(--green-light);color:var(--green);border:1px solid #a7f3d0}
+
+/* Pulsing dot animation - visual indicator of ongoing process */
+.dot-pulse{
+  width:7px;height:7px;border-radius:50%;     /* Perfect circle */
+  background:currentColor;                    /* Inherits color from parent */
+  animation:pulse 1s infinite;                /* Repeating pulse animation */
+}
+
+/* Pulse animation keyframes: fade in and out */
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+/* ═══════════════ DATABASE TABLE STYLES ═══════════════ */
+/* Database table wrapper with horizontal scrolling for mobile */
+.db-wrap{overflow-x:auto;margin-top:16px}
+
+/* Table styling for displaying database records */
+table{
+  width:100%;border-collapse:collapse;        /* No space between borders */
+  font-size:12px;font-family:var(--mono);     /* Monospace for data display */
+}
+
+/* Table header cells */
+th{
+  background:var(--accent);color:#fff;        /* Accent background with white text */
+  padding:8px 10px;text-align:left;           /* Left-aligned, consistent padding */
+  font-weight:600;white-space:nowrap;         /* Don't wrap header text */
+}
+
+/* Table data cells */
+td{
+  padding:8px 10px;border-bottom:1px solid var(--border);  /* Bottom border for rows */
+  vertical-align:top;word-break:break-all;    /* Wrap long words */
+  max-width:160px;                            /* Prevent table from being too wide */
+}
+
+/* Last row doesn't need bottom border */
+tr:last-child td{border-bottom:none}
+
+/* Row hover effect - highlight on mouse over */
+tr:hover td{background:var(--surface2)}
+
+/* Encrypted data cell - show in red to indicate unreadable */
+.td-enc{color:var(--red);font-size:11px}
+
+/* OK/readable data cell - show in green */
+.td-ok{color:#065f46}
+
+/* Metadata cell - show in muted gray */
+.td-m{color:var(--text2)}
+
+/* Animation for new row insertion */
+@keyframes rowIn{from{background:#e0e7ff}to{background:transparent}}
+
+/* New row class - animates the background on insertion */
+.row-new td{animation:rowIn .6s ease}
+/* ═══════════════ TAB NAVIGATION ═══════════════ */
+/* Tab navigation container - horizontal button bar */
+.tabs{
+  display:flex;gap:4px;                       /* Flex layout with tight spacing */
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:4px;             /* Padding creates space around buttons */
+  margin-bottom:24px;
+}
+
+/* Individual tab button */
+.tab{
+  flex:1;padding:9px 14px;border:none;
+  background:transparent;color:var(--text2);  /* Initially transparent background */
+  font-family:var(--sans);font-size:13px;font-weight:500;
+  border-radius:7px;cursor:pointer;           /* Rounded to match container */
+  transition:all .18s;                        /* Smooth transition on click */
+}
+
+/* Active/selected tab */
+.tab.on{
+  background:var(--surface);color:var(--text);  /* White background, darker text */
+  box-shadow:0 1px 4px rgba(0,0,0,.1);       /* Subtle shadow to show selection */
+}
+
+/* Tab panel: content container for each tab */
+.panel{display:none}                          /* Hidden by default */
+
+/* Active panel: show this tab's content */
+.panel.on{display:block}
+/* ═══════════════ ALGORITHM INFO CARDS ═══════════════ */
+/* Two-column grid for displaying algorithm explanation cards */
+.algo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+
+/* Individual algorithm information card */
+.algo-card{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:10px;padding:16px;            /* Internal padding */
+}
+
+/* Algorithm card heading (with colored badge) */
+.algo-card h4{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+
+/* Algorithm card body text */
+.algo-card p{font-size:12px;color:var(--text2);line-height:1.75}
+
+/* Algorithm badge ("AES-256-GCM", "Bcrypt", etc.) */
+.a-badge{font-size:10px;font-family:var(--mono);padding:2px 8px;border-radius:4px;font-weight:600}
+/* ═══════════════ PASSWORD HASH DISPLAY ═══════════════ */
+/* Box displaying the bcrypt hash output */
+.hash-box{
+  background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:12px 14px;
+  font-family:var(--mono);font-size:11px;     /* Monospace for hash display */
+  word-break:break-all;min-height:56px;       /* Enough space for hash */
+  color:var(--text2);line-height:1.7;         /* Readable line height */
+}
+
+/* Hash box with a valid hash value (show green) */
+.hash-box.has-val{
+  color:var(--green);border-color:var(--green);
+  background:var(--green-light);              /* Light green tint */
+}
+/* ═══════════════ PASSWORD VERIFICATION ═══════════════ */
+/* Flex row for password verification controls */
+.verify-row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+
+/* Verification result badge/message */
+.v-result{
+  flex-shrink:0;padding:10px 16px;border-radius:8px;
+  font-size:13px;font-weight:600;display:none;  /* Hidden until result is shown */
+}
+
+/* Show the result when verification is complete */
+.v-result.show{display:inline-flex;align-items:center;gap:6px}
+
+/* Result: password matches (success state) */
+.v-ok{background:var(--green-light);color:var(--green);border:1px solid #a7f3d0}
+
+/* Result: password doesn't match (failure state) */
+.v-fail{background:var(--red-light);color:var(--red);border:1px solid #fecaca}
+/* ═══════════════ CALLOUT/INFO BOXES ═══════════════ */
+/* Highlighted information/explanation box */
+.callout{
+  border-left:3px solid var(--accent);        /* Colored left border for emphasis */
+  background:var(--accent-light);             /* Light accent background */
+  border-radius:0 8px 8px 0;                  /* Only round right corners */
+  padding:12px 16px;font-size:13px;
+  color:#312e81;                              /* Dark text for readability */
+  margin:14px 0;line-height:1.7;              /* Good line height for reading */
+}
+
+/* Strong/bold text within callouts */
+.callout strong{font-weight:600}              /* Heavier weight for emphasis */
+/* ═══════════════ ANIMATIONS & LOADING ═══════════════ */
+/* Spinning animation keyframes - full 360 degree rotation */
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* Spinner element - shows loading/processing state */
+.spinner{
+  width:14px;height:14px;
+  border:2px solid rgba(255,255,255,.4);      /* Mostly transparent border */
+  border-top-color:#fff;                      /* Solid top border for rotation effect */
+  border-radius:50%;                          /* Perfect circle */
+  animation:spin .7s linear infinite;         /* Continuous rotation */
+  flex-shrink:0;                              /* Non-shrinkable in flex layouts */
+}
+/* ═══════════════ CODE/SQL DISPLAY ═══════════════ */
+/* Dark theme code block for displaying SQL schema */
+.code-dark{
+  background:#1e293b;                         /* Very dark navy background */
+  border-radius:8px;padding:16px;
+  font-family:var(--mono);font-size:12px;
+  color:#94a3b8;                              /* Light gray text */
+  line-height:1.8;overflow-x:auto;            /* Scrollable if code exceeds width */
+}
+
+/* Syntax highlighting colors for code display */
+.cbl{color:#64748b}                           /* Comment: dark blue-gray */
+.ck{color:#7dd3fc}                            /* Keyword: light blue (CREATE, TABLE, etc.) */
+.ct{color:#a5f3fc}                            /* Table name: cyan-blue */
+.co{color:#fb923c}                            /* Type: orange (INT, VARCHAR, etc.) */
+.cc{color:#c4b5fd}                            /* Column name: purple */
+.cr{color:#fca5a5}                            /* Sensitive column: light red */
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- NAVIGATION BAR: Top-level header with branding and algorithm badge -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<nav>
+  <!-- Vault/lock icon SVG: visual branding -->
+  <div class="nav-icon">
+    <svg width="18" height="18" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" viewBox="0 0 24 24">
+      <!-- Padlock shape -->
+      <rect x="3" y="11" width="18" height="11" rx="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  </div>
+  
+  <!-- Site branding: title and subtitle -->
+  <h1>Credit Card Vault <small>— Encryption Demo</small></h1>
+  
+  <!-- Badge showing the main cryptographic algorithms used in this demo -->
+  <span class="nav-badge">AES-256-GCM · PBKDF2 · Web Crypto API</span>
+</nav>
+
+<!-- Main content container -->
+<div class="container">
+
+  <!-- ═══════════════ TAB NAVIGATION ═══════════════ -->
+  <!-- Tab buttons to switch between different demonstration sections -->
+  <div class="tabs">
+    <!-- Tab 1: Card Encryption (default active) - Demonstrates AES-256-GCM encryption -->
+    <button class="tab on" onclick="sw('enc',this)">Card Encryption</button>
+    
+    <!-- Tab 2: Password Hashing - Demonstrates bcrypt-style password hashing with PBKDF2 -->
+    <button class="tab" onclick="sw('pw',this)">Password Hashing</button>
+    
+    <!-- Tab 3: Simulated Database - Shows how encrypted data is stored in database records -->
+    <button class="tab" onclick="sw('db',this)">Simulated Database</button>
+    
+    <!-- Tab 4: Algorithm Info - Explains why these specific algorithms are chosen -->
+    <button class="tab" onclick="sw('info',this)">Algorithm Info</button>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 1: CARD ENCRYPTION — Main encryption demonstration                          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab-enc" class="panel on">
+    <!-- Section heading labels -->
+    <div class="sec-label">Phase 2 — Core Demo</div>
+    <div class="sec-title">AES-256 Card Encryption</div>
+    <!-- Section introduction text -->
+    <div class="sec-sub">Enter card details below. The browser encrypts them using the Web Crypto API — the same standard used by banks. Watch the animated pipeline to see every step of what actually happens.</div>
+
+    <!-- Card input form - sensitive credit card data entry -->
+    <div class="card">
+      <!-- Form header with status indicator -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+        <span style="font-size:13px;font-weight:600;color:var(--text2)">Card Details Input</span>
+        <!-- Status chip shows: Waiting (idle), pulsing dot (processing), or checkmark (done) -->
+        <span id="enc-status" class="chip chip-idle">Waiting</span>
+      </div>
+      
+      <!-- Form layout: cardholder name (full width), card number (full width), exp/cvv (2 columns) -->
+      <div class="form-row">
+        <!-- Cardholder name field (full width) -->
+        <div class="field full"><label>Cardholder Name</label><input id="f-name" type="text" value="Jane Doe"></div>
+        
+        <!-- Card number field (full width) with 19-char max and auto-formatting every 4 digits -->
+        <div class="field full"><label>Card Number</label><input id="f-card" type="text" value="4532015112830366" maxlength="19" oninput="fmtCard(this)"></div>
+        
+        <!-- Expiry date field (MM/YY format) -->
+        <div class="field"><label>Expiry Date</label><input id="f-exp" type="text" value="12/26" maxlength="5"></div>
+        
+        <!-- CVV security code -->
+        <div class="field"><label>CVV</label><input id="f-cvv" type="text" value="123" maxlength="4"></div>
+      </div>
+      
+      <!-- Main encryption button with icon -->
+      <button class="btn btn-primary" id="enc-btn" onclick="runEncryption()">
+        <!-- Lock icon SVG -->
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Encrypt Card Data
+      </button>
+    </div>
+
+    <!-- Encryption pipeline container: 6-step visual demonstration of the encryption process -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:20px">Encryption Pipeline — step by step</div>
+      <div class="pipeline">
+
+        <!-- STEP 1: Read plaintext card values from the form input -->
+        <div class="pipe-step" id="ps-0">
+          <div class="pipe-left"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">1</span> Read plaintext values</div>
+            <div class="pipe-desc">The raw card number, CVV and expiry date are read from the form. These are the sensitive values that must <em>never</em> be stored as-is in any database.</div>
+            <div class="pipe-box" id="pb-0"><span style="color:var(--text3)">Waiting for input...</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 2: Generate AES-256 encryption key (256-bit / 32-byte) -->
+        <div class="pipe-step" id="ps-1">
+          <div class="pipe-left"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">2</span> Generate AES-256 encryption key</div>
+            <div class="pipe-desc">A 256-bit (32-byte) symmetric key is generated using <code>window.crypto.subtle.generateKey()</code>. In a real system this key lives on a secure app server — it is <strong>never stored in the database</strong>.</div>
+            <div class="pipe-box" id="pb-1"><span style="color:var(--text3)">Waiting...</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 3: Generate fresh random IV (Initialization Vector) for each field -->
+        <div class="pipe-step" id="ps-2">
+          <div class="pipe-left"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">3</span> Generate a fresh random IV per field</div>
+            <div class="pipe-desc">An Initialisation Vector (IV) is a random 12-byte number generated fresh for each encryption. It ensures encrypting the same card number twice gives completely different ciphertext — preventing pattern-matching attacks.</div>
+            <div class="pipe-box" id="pb-2"><span style="color:var(--text3)">Waiting...</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 4: Encrypt each field independently using AES-256-GCM -->
+        <div class="pipe-step" id="ps-3">
+          <div class="pipe-left"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">4</span> Encrypt with AES-256-GCM</div>
+            <div class="pipe-desc">Each field is encrypted independently. AES-256-GCM provides both <strong>confidentiality</strong> (hides the data) and <strong>authenticity</strong> (verifies it hasn't been tampered with). The output is raw binary ciphertext — completely unreadable.</div>
+            <div class="pipe-box enc" id="pb-3"><span style="color:var(--text3)">Waiting...</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 5: Base64-encode IV+ciphertext for safe database text column storage -->
+        <div class="pipe-step" id="ps-4">
+          <div class="pipe-left"><div class="pipe-dot"></div><div class="pipe-line"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">5</span> Base64-encode IV + ciphertext</div>
+            <div class="pipe-desc">Raw ciphertext is binary. To store it safely in a database text column, it's Base64-encoded. The IV is prepended to the ciphertext so it's available during decryption. Format: <code>Base64(IV || ciphertext)</code>.</div>
+            <div class="pipe-box" id="pb-4"><span style="color:var(--text3)">Waiting...</span></div>
+          </div>
+        </div>
+
+        <!-- STEP 6: Store encrypted data in database and verify decryption works -->
+        <div class="pipe-step" id="ps-5">
+          <div class="pipe-left"><div class="pipe-dot"></div></div>
+          <div class="pipe-content">
+            <div class="pipe-title"><span class="step-badge">6</span> Store in DB — verify decryption works</div>
+            <div class="pipe-desc">Only ciphertext is saved to the database. The decryption test here confirms the process is fully reversible. Switch to the <strong>Simulated Database</strong> tab to inspect the stored record.</div>
+            <div class="pipe-box ok" id="pb-5"><span style="color:var(--text3)">Waiting...</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 2: PASSWORD HASHING — Bcrypt-style password hashing demonstration            -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab-pw" class="panel">
+    <!-- Section heading -->
+    <div class="sec-label">Phase 2 — Password Security</div>
+    <div class="sec-title">Password Hashing</div>
+    <!-- Key distinction: passwords are hashed, not encrypted -->
+    <div class="sec-sub">Passwords are never encrypted — they are <em>hashed</em>. Hashing is a one-way process: you can verify a password matches a stored hash, but you cannot reverse the hash to recover the original password.</div>
+
+    <!-- Educational callout explaining encryption vs hashing -->
+    <div class="callout">
+      <strong>Encryption vs Hashing — why the difference?</strong><br>
+      Card numbers need to be <em>retrieved</em> later (for payments), so they're encrypted (reversible with a key). Passwords only need to be <em>verified</em>, never retrieved. Hashing is irreversible — even database admins cannot read a user's actual password.
+    </div>
+
+    <!-- Password hashing card: input password and hash it -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:16px">Hash a Password</div>
+      <div class="form-row">
+        <!-- Password input -->
+        <div class="field"><label>Password</label><input id="pw-input" type="text" value="SecurePass@2024"></div>
+        <!-- Cost factor selector (8-14): higher = slower hashing, more resistant to brute force) -->
+        <div class="field"><label>Cost Factor (work rounds 8–14)</label><input id="pw-cost" type="number" value="10" min="8" max="14"></div>
+      </div>
+      <!-- Hash button -->
+      <button class="btn btn-primary" onclick="hashPassword()" id="pw-btn">Hash Password (Bcrypt-style)</button>
+      
+      <!-- Hash output display -->
+      <div style="margin-top:18px">
+        <label style="display:block;margin-bottom:6px">Hash Output — stored in passwordHash column</label>
+        <div class="hash-box" id="hash-out">Click "Hash Password" to generate...</div>
+      </div>
+      
+      <!-- Password verification section: test if passwords match -->
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px">Verify a Password Against the Hash</div>
+        <div class="verify-row">
+          <!-- Test password input (disabled until hash is generated) -->
+          <div class="field" style="flex:1"><label>Test Password</label><input id="pw-verify" type="text" placeholder="Type a password to verify..." disabled></div>
+          <!-- Verify button (disabled until hash is generated) -->
+          <button class="btn btn-sm" onclick="verifyPw()" id="verify-btn" disabled style="height:42px;align-self:flex-end">Verify</button>
+          <!-- Result indicator (hidden until verification is attempted) -->
+          <div class="v-result" id="v-result"></div>
+        </div>
+        
+        <!-- Explanation of why hashing is slow on purpose -->
+        <div class="callout" style="margin-top:12px">
+          <strong>Why is hashing slow on purpose?</strong> The cost factor controls how many rounds of computation happen (2<sup>cost</sup> iterations). Higher cost = slower. At cost 12 it takes ~300ms — making brute-force attacks take millions of years instead of seconds. The random salt means the same password hashes differently each time.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 3: SIMULATED DATABASE — Shows what encrypted data looks like in MySQL            -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab-db" class="panel">
+    <!-- Section heading -->
+    <div class="sec-label">Phase 2 — Storage Layer</div>
+    <div class="sec-title">Simulated CardDetails Table</div>
+    <!-- Overview: shows what encrypted data looks like in the database -->
+    <div class="sec-sub">This shows what the CardDetails table looks like in MySQL after cards are encrypted and inserted. Sensitive columns contain only ciphertext — completely unreadable without the encryption key.</div>
+
+    <!-- Database table display card -->
+    <div class="card">
+      <!-- Table header with title and clear button -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div>
+          <div style="font-size:13px;font-weight:600">CardDetails</div>
+          <!-- Database info: schema name and database type -->
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px">card_vault database · MySQL</div>
+        </div>
+        <!-- Clear button to remove all records -->
+        <button class="btn btn-sm" onclick="clearDB()">Clear table</button>
+      </div>
+      
+      <!-- Table wrapper with horizontal scroll for mobile -->
+      <div class="db-wrap">
+        <table id="db-table">
+          <!-- Table header row -->
+          <thead>
+            <tr>
+              <!-- CardID: unique primary key identifier -->
+              <th>CardID</th>
+              <!-- HolderName: cardholder name (stored plaintext) -->
+              <th>HolderName</th>
+              <!-- CardMask: last 4 digits of card (stored plaintext for UI display) -->
+              <th>CardMask</th>
+              <!-- CardNo: encrypted card number (Base64 ciphertext) -->
+              <th>CardNo <span style="font-size:9px;opacity:.7">(encrypted)</span></th>
+              <!-- ExpiryDate: encrypted expiry date (Base64 ciphertext) -->
+              <th>ExpiryDate <span style="font-size:9px;opacity:.7">(encrypted)</span></th>
+              <!-- CVV: encrypted security code (Base64 ciphertext) -->
+              <th>CVV <span style="font-size:9px;opacity:.7">(encrypted)</span></th>
+              <!-- Action column: decrypt button -->
+              <th></th>
+            </tr>
+          </thead>
+          <!-- Table body: populated by renderDB() function -->
+          <tbody id="db-body">
+            <!-- Empty state message (shown before any cards are encrypted) -->
+            <tr id="db-empty"><td colspan="7" style="text-align:center;color:var(--text3);padding:28px;font-size:13px">No records yet — go to Card Encryption tab and encrypt a card first</td></tr>
+          </tbody>
+        </table>
+      </div>
+      
+      <!-- Callout explaining the data in the table -->
+      <div class="callout" style="margin-top:16px">
+        <strong>Notice:</strong> CardNo, CVV, and ExpiryDate contain only Base64 ciphertext. CardMask (last 4 digits) is stored plaintext — safe for display. Click <strong>Decrypt</strong> on any row to prove the data is fully recoverable.
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">SQL Schema — column definitions</div>
+      <div class="code-dark">
+        <span class="cbl">-- Sensitive fields stored as TEXT (Base64-encoded ciphertext)</span><br>
+        <span class="ck">CREATE TABLE</span> <span class="ct">CardDetails</span> (<br>
+        &nbsp;&nbsp;<span class="cc">CardID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="co">INT</span> <span class="ck">AUTO_INCREMENT PRIMARY KEY</span>,<br>
+        &nbsp;&nbsp;<span class="cc">CustomerId</span>&nbsp;<span class="co">INT</span> <span class="ck">NOT NULL</span>,<br>
+        &nbsp;&nbsp;<span class="cc">HolderName</span>&nbsp;<span class="co">VARCHAR(100)</span> <span class="ck">NOT NULL</span>,<br>
+        &nbsp;&nbsp;<span class="cc">CardMask</span>&nbsp;&nbsp;&nbsp;<span class="co">VARCHAR(4)</span> <span class="ck">NOT NULL</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cbl">-- last 4 digits, safe to store plain</span><br>
+        &nbsp;&nbsp;<span class="cr">CardNo</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="co">TEXT</span> <span class="ck">NOT NULL</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cbl">-- AES-256-GCM ciphertext (Base64)</span><br>
+        &nbsp;&nbsp;<span class="cr">ExpiryDate</span>&nbsp;<span class="co">TEXT</span> <span class="ck">NOT NULL</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cbl">-- AES-256-GCM ciphertext (Base64)</span><br>
+        &nbsp;&nbsp;<span class="cr">CVV</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="co">TEXT</span> <span class="ck">NOT NULL</span>,&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="cbl">-- AES-256-GCM ciphertext (Base64)</span><br>
+        &nbsp;&nbsp;<span class="ck">FOREIGN KEY</span> (CustomerId) <span class="ck">REFERENCES</span> CustomerDetails(CustomerId)<br>
+        );
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <!-- TAB 4: ALGORITHM INFO — Technical justification for cryptographic choices          -->
+  <!-- ═══════════════════════════════════════════════════════ -->
+  <div id="tab-info" class="panel">
+    <!-- Section heading -->
+    <div class="sec-label">Phase 2 — Technical Justification</div>
+    <div class="sec-title">Why These Algorithms?</div>
+    <!-- Overview: explains the security reasoning behind each choice -->
+    <div class="sec-sub">Every cryptographic decision in this system was made for a specific security reason.</div>
+
+    <div class="card">
+      <div class="algo-grid">
+        <div class="algo-card">
+          <h4>AES-256-GCM <span class="a-badge" style="background:var(--accent-light);color:var(--accent)">Card Fields</span></h4>
+          <p><strong>What it is:</strong> Advanced Encryption Standard, 256-bit key, Galois/Counter Mode.<br><br>
+          <strong>Why 256-bit?</strong> 2²⁵⁶ possible keys — more than atoms in the universe. Brute force is computationally impossible.<br><br>
+          <strong>Why GCM mode?</strong> Unlike CBC, GCM provides both confidentiality (hides data) and integrity (detects tampering). If ciphertext is modified, decryption fails.<br><br>
+          <strong>Why random IV per field?</strong> Encrypting the same card number twice produces different ciphertext, preventing pattern-matching attacks.</p>
+        </div>
+        <div class="algo-card">
+          <h4>Bcrypt <span class="a-badge" style="background:var(--green-light);color:var(--green)">Passwords</span></h4>
+          <p><strong>What it is:</strong> A password hashing function designed to be intentionally slow and computationally expensive.<br><br>
+          <strong>Why not SHA-256?</strong> SHA-256 hashes billions of passwords per second. A GPU can crack most passwords in minutes. Bcrypt at cost 12 takes ~300ms — making brute-force 10 billion times slower.<br><br>
+          <strong>Built-in salting:</strong> Random salt prevents rainbow table attacks (pre-computed hash tables).<br><br>
+          <strong>Why not encrypt passwords?</strong> If the key leaks, all encrypted passwords are exposed. Hashing is irreversible.</p>
+        </div>
+        <div class="algo-card">
+          <h4>Key Management</h4>
+          <p><strong>Where is the key stored?</strong> Never in the database. In production it lives as an environment variable on the app server, or in a dedicated KMS (AWS KMS / HashiCorp Vault).<br><br>
+          <strong>Why separate?</strong> A stolen database dump only contains ciphertext. Without the key — stored on a separate machine — it's completely useless to an attacker.<br><br>
+          <strong>Key rotation:</strong> Keys are rotated every 90 days. Old records are re-encrypted with the new key.</p>
+        </div>
+        <div class="algo-card">
+          <h4>Application-Layer Encryption</h4>
+          <p><strong>Why not MySQL AES_ENCRYPT()?</strong> MySQL's built-in encryption stores the key in the same database as the data — defeating the purpose. If the DB is stolen, so is the key.<br><br>
+          <strong>Our approach:</strong> Encryption happens in the application before data is sent to MySQL. The database only ever receives and stores ciphertext.<br><br>
+          <strong>The result:</strong> Data (DB) and key (app server) are on separate machines. An attacker must compromise both.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Decision comparison table: shows our choices vs alternatives -->
+    <div class="card">
+      <!-- Table title -->
+      <div style="font-size:13px;font-weight:600;margin-bottom:14px">Decision comparison</div>
+      <!-- Scrollable comparison table -->
+      <div style="overflow-x:auto">
+        <table style="font-size:12px">
+          <!-- Table header: Decision | Our Choice | Alternative | Why Ours is Stronger -->
+          <thead><tr><th>Decision</th><th>Our Choice</th><th>Alternative</th><th>Why ours is stronger</th></tr></thead>
+          <tbody>
+            <!-- Row 1: Encryption mode comparison -->
+            <tr><td>Encryption mode</td><td style="color:var(--green);font-weight:600">AES-256-GCM</td><td style="color:var(--text2)">AES-256-CBC</td><td>GCM adds authentication — detects tampering. CBC does not.</td></tr>
+            <!-- Row 2: Key size comparison -->
+            <tr><td>Key size</td><td style="color:var(--green);font-weight:600">256-bit</td><td style="color:var(--text2)">128-bit</td><td>Double the brute-force resistance. Required under PCI-DSS.</td></tr>
+            <!-- Row 3: IV strategy comparison -->
+            <tr><td>IV strategy</td><td style="color:var(--green);font-weight:600">Random per field</td><td style="color:var(--text2)">Fixed IV</td><td>Unique IVs prevent ciphertext pattern detection.</td></tr>
+            <!-- Row 4: Password storage comparison -->
+            <tr><td>Password storage</td><td style="color:var(--green);font-weight:600">Bcrypt cost 12</td><td style="color:var(--text2)">SHA-256</td><td>10 billion times slower per attempt. SHA-256 is crackable in seconds.</td></tr>
+            <!-- Row 5: Encryption location comparison -->
+            <tr><td>Encryption location</td><td style="color:var(--green);font-weight:600">App layer (before DB)</td><td style="color:var(--text2)">MySQL AES_ENCRYPT()</td><td>DB never sees plaintext. Key separated from data.</td></tr>
+            <!-- Row 6: Card display strategy comparison -->
+            <tr><td>CardNo display</td><td style="color:var(--green);font-weight:600">Store last 4 digits (mask)</td><td style="color:var(--text2)">Decrypt on every display</td><td>No decryption needed for UI. Reduces key usage and exposure.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ═════════════════════════════════════════════════════════════════════════════════ */
+/* JAVASCRIPT: CRYPTOGRAPHIC OPERATIONS & UI MANAGEMENT                              */
+/* ═════════════════════════════════════════════════════════════════════════════════ */
+
+/* ══════ GLOBAL STATE VARIABLES ══════ */
+let AES_KEY=null;                   /* Global encryption key: shared for all AES-256 operations (generated once) */
+let dbRecords=[];                   /* Array storing encrypted card records from the simulated database */
+let recId=1;                        /* Counter for assigning unique IDs to new records */
+let lastHash=null;                  /* Last computed bcrypt-format password hash (for verification) */
+let lastPw=null;                    /* Last plain-text password (for verification comparison) */
+
+/* ══════ KEY MANAGEMENT FUNCTIONS ══════ */
+
+/**
+ * Get or generate AES-256-GCM encryption key
+ * 
+ * Security note: In production, this key would be:
+ * - Stored securely on the app server (environment variable or key management service)
+ * - Never stored in the database
+ * - Rotated periodically (every 90 days recommended)
+ * - Protected by access controls (only app server has access)
+ * 
+ * In this demo, we generate it on-the-fly in the browser to show how it works.
+ * Real systems would fetch this from a secure server endpoint.
+ * 
+ * @returns {CryptoKey} AES-256 key suitable for encryption/decryption
+ */
+async function getKey(){
+  if(AES_KEY)return AES_KEY;        /* Return existing key if already generated */
+  /* Generate 256-bit (32-byte) AES key using Web Crypto API */
+  AES_KEY=await crypto.subtle.generateKey(
+    {name:"AES-GCM",length:256},    /* Algorithm: AES-GCM, key length: 256 bits */
+    true,                            /* extractable: true (allows exporting for demo, false in production) */
+    ["encrypt","decrypt"]           /* Usages: allow both encryption and decryption */
+  );
+  return AES_KEY;
+}
+
+/**
+ * Encrypt a single field using AES-256-GCM
+ * 
+ * Process:
+ * 1. Generate a fresh random 12-byte IV (Initialization Vector)
+ * 2. Encrypt the plaintext using AES-256-GCM with the IV and encryption key
+ * 3. Concatenate IV + ciphertext (IV needed for decryption)
+ * 4. Base64-encode the result (for safe storage in database text columns)
+ * 
+ * Security rationale:
+ * - Random IV per field ensures same plaintext encrypts to different ciphertext
+ * - GCM mode provides both confidentiality and authenticity
+ * - IV is included in output because it's not secret (only key is secret)
+ * 
+ * @param {string} pt - Plaintext to encrypt (e.g., card number "4532015112830366")
+ * @param {CryptoKey} key - AES-256 encryption key
+ * @returns {Object} {iv: hex_string, b64: base64_string} - IV in hex, Base64(IV||ciphertext)
+ */
+async function encField(pt,key){
+  /* Generate 12-byte random IV (Initialization Vector) - required per GCM message */
+  const iv=crypto.getRandomValues(new Uint8Array(12));
+  
+  /* Perform AES-256-GCM encryption */
+  const ct=await crypto.subtle.encrypt(
+    {name:"AES-GCM",iv},             /* Algorithm + IV */
+    key,                             /* AES key */
+    new TextEncoder().encode(pt)     /* Plaintext converted to UTF-8 bytes */
+  );
+  
+  /* Concatenate IV (first 12 bytes) + ciphertext to create output */
+  const buf=new Uint8Array(12+ct.byteLength);
+  buf.set(iv);                       /* First 12 bytes: IV */
+  buf.set(new Uint8Array(ct),12);    /* Next N bytes: ciphertext */
+  
+  return{
+    iv:hex(iv),                      /* Return IV as hex string for display */
+    b64:btoa(String.fromCharCode(...buf))  /* Return Base64(IV||ciphertext) for DB storage */
+  };
+}
+
+/**
+ * Decrypt a field encrypted with AES-256-GCM
+ * 
+ * Process:
+ * 1. Base64-decode the stored ciphertext
+ * 2. Extract the IV (first 12 bytes) and ciphertext (remaining bytes)
+ * 3. Use AES-256-GCM to decrypt with the extracted IV
+ * 4. Convert result back to string
+ * 
+ * @param {string} b64 - Base64-encoded (IV||ciphertext) from database
+ * @param {CryptoKey} key - AES-256 encryption key
+ * @returns {string} Decrypted plaintext (e.g., card number)
+ */
+async function decField(b64,key){
+  /* Base64-decode and convert to Uint8Array */
+  const raw=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  
+  /* Decrypt using AES-256-GCM */
+  const pt=await crypto.subtle.decrypt(
+    {name:"AES-GCM",iv:raw.slice(0,12)},  /* Extract and use stored IV (first 12 bytes) */
+    key,                                    /* AES key */
+    raw.slice(12)                          /* Ciphertext (bytes after IV) */
+  );
+  
+  /* Convert decrypted bytes back to UTF-8 string */
+  return new TextDecoder().decode(pt);
+}
+
+/**
+ * Convert bytes to hexadecimal string
+ * Utility function for displaying binary data in human-readable format
+ * 
+ * @param {Uint8Array} buf - Binary data
+ * @returns {string} Hex string (e.g., "4f46e51a...")
+ */
+function hex(buf){
+  return Array.from(buf)
+    .map(b=>b.toString(16).padStart(2,'0'))  /* Convert each byte to hex, pad with 0 */
+    .join('');
+}
+
+/**
+ * Utility sleep function for animation delays
+ * Used to animate the encryption pipeline steps with smooth timing
+ * 
+ * @param {number} ms - Milliseconds to sleep
+ * @returns {Promise} Resolves after specified time
+ */
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+/* ══════ UI STATE UPDATE FUNCTIONS ══════ */
+
+/**
+ * Update the visual state of a pipeline step
+ * Changes opacity and styling based on whether step is pending, active, or done
+ * 
+ * @param {number} i - Step index (0-5 for encryption pipeline)
+ * @param {string} s - State: '' (pending), 'active' (processing), 'done' (complete)
+ */
+function setStep(i,s){
+  document.getElementById('ps-'+i).className='pipe-step'+( s?' '+s:'');
+}
+
+/**
+ * Update the content and styling of a pipeline step's display box
+ * Shows the actual data/result for each step
+ * 
+ * @param {number} i - Step index
+ * @param {string} h - HTML content to display
+ * @param {string} c - CSS class ('' for default, 'hl' for highlighted, 'enc' for encrypted, 'ok' for verified)
+ */
+function setBox(i,h,c){
+  const b=document.getElementById('pb-'+i);
+  b.innerHTML=h;
+  b.className='pipe-box'+(c?' '+c:'');
+}
+
+/**
+ * Update the status chip (small badge showing overall process status)
+ * Displays "Waiting", spinner during processing, or checkmark when done
+ * 
+ * @param {string} id - Element ID of the chip
+ * @param {string} s - State: 'idle', 'run' (running), 'done' (completed)
+ * @param {string} txt - Display text
+ */
+function setChip(id,s,txt){
+  /* Map state to CSS class */
+  const m={idle:'chip chip-idle',run:'chip chip-run',done:'chip chip-done'};
+  /* Map state to icon/prefix */
+  const ic={idle:'',run:'<span class="dot-pulse"></span> ',done:'✓ '};
+  document.getElementById(id).className=m[s];
+  document.getElementById(id).innerHTML=ic[s]+txt;
+}
+
+/* ══════ MAIN ENCRYPTION FUNCTION ══════ */
+
+/**
+ * Main encryption demo function
+ * Reads card details from form, encrypts each field with AES-256-GCM, verifies decryption works,
+ * and displays step-by-step animation of the entire encryption pipeline
+ * 
+ * The 6 steps demonstrated:
+ * 1. Read plaintext card values from form
+ * 2. Generate AES-256 encryption key
+ * 3. Generate fresh random IV for each field
+ * 4. Encrypt all fields with AES-256-GCM (produces unreadable ciphertext)
+ * 5. Base64-encode IV + ciphertext for database storage
+ * 6. Decrypt and verify the process is fully reversible
+ */
+async function runEncryption(){
+  /* Read card details from form inputs */
+  const name=document.getElementById('f-name').value.trim()||'Jane Doe';
+  const raw=document.getElementById('f-card').value.replace(/\s/g,'');  /* Remove spaces from card number */
+  const exp=document.getElementById('f-exp').value.trim();
+  const cvv=document.getElementById('f-cvv').value.trim();
+  
+  /* Validate that all required fields are filled */
+  if(!raw||!exp||!cvv){alert('Fill in all card fields.');return;}
+
+  /* Disable button and show processing state */
+  const btn=document.getElementById('enc-btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Encrypting...';
+  setChip('enc-status','run','Encrypting');  /* Update status chip */
+  
+  /* Reset all pipeline steps to initial state */
+  for(let i=0;i<6;i++){
+    setStep(i,'');                           /* Remove active/done states */
+    document.getElementById('pb-'+i).className='pipe-box';  /* Reset box styling */
+  }
+
+  /* ══════ STEP 1: READ PLAINTEXT VALUES ══════ */
+  setStep(0,'active');                       /* Mark step as active */
+  await sleep(350);                          /* Pause for animation */
+  setBox(0,`<span class="tag t-plain">PLAINTEXT</span><br>Card No: <strong>${raw}</strong><br>Expiry: <strong>${exp}</strong><br>CVV: <strong>${cvv}</strong>`,'hl');
+  setStep(0,'done');                         /* Mark step as complete */
+
+  /* ══════ STEP 2: GENERATE AES-256 KEY ══════ */
+  setStep(1,'active');
+  await sleep(450);
+  const key=await getKey();                  /* Get or generate AES key */
+  /* Export key to raw format to display it */
+  const rk=await crypto.subtle.exportKey("raw",key);
+  const kh=hex(new Uint8Array(rk));
+  setBox(1,`<span class="tag t-key">AES-256 KEY (256-bit)</span><br>${kh.slice(0,32)}<br>${kh.slice(32,64)}<br><span style="color:var(--text3);font-size:10px">⚠ Shown here for demo only. In production this never leaves the app server.</span>`);
+  setStep(1,'done');
+
+  /* ══════ STEP 3: GENERATE RANDOM IVs ══════ */
+  setStep(2,'active');
+  await sleep(400);
+  /* Encrypt each field to generate IVs (encryption also happens here) */
+  const eCard=await encField(raw,key);
+  const eExp=await encField(exp,key);
+  const eCvv=await encField(cvv,key);
+  setBox(2,`<span class="tag t-iv">RANDOM IV — 12 bytes each (fresh per field)</span><br>Card IV: <strong>${eCard.iv}</strong><br>Expiry IV: <strong>${eExp.iv}</strong><br>CVV IV: <strong>${eCvv.iv}</strong><br><span style="color:var(--text3);font-size:10px">Same card number encrypted again → completely different IVs and ciphertext</span>`);
+  setStep(2,'done');
+
+  /* ══════ STEP 4: AES-256-GCM ENCRYPTION ══════ */
+  setStep(3,'active');
+  await sleep(500);
+  setBox(3,`<span class="tag t-cipher">AES-256-GCM CIPHERTEXT (raw binary → shown as hex preview)</span><br>Card: <strong>${eCard.b64.slice(0,40)}...</strong><br>Expiry: <strong>${eExp.b64.slice(0,40)}...</strong><br>CVV: <strong>${eCvv.b64.slice(0,40)}...</strong>`,'enc');
+  setStep(3,'done');
+
+  /* ══════ STEP 5: BASE64 ENCODING FOR DATABASE ══════ */
+  setStep(4,'active');
+  await sleep(400);
+  setBox(4,`<span class="tag t-iv">BASE64 ENCODED — format: Base64(IV || ciphertext)</span><br>Card: ${eCard.b64.slice(0,52)}...<br>Expiry: ${eExp.b64.slice(0,52)}...<br>CVV: ${eCvv.b64.slice(0,52)}...<br><span style="color:var(--text3);font-size:10px">Stored as TEXT column in MySQL — ready for DB insert</span>`);
+  setStep(4,'done');
+
+  /* ══════ STEP 6: DECRYPT & VERIFY ══════ */
+  setStep(5,'active');
+  await sleep(500);
+  /* Decrypt all fields to prove reversibility */
+  const dCard=await decField(eCard.b64,key);
+  const dExp=await decField(eExp.b64,key);
+  const dCvv=await decField(eCvv.b64,key);
+  setBox(5,`<span class="tag t-stored">DECRYPTION VERIFIED ✓</span><br>Card No: <strong>${dCard}</strong> ${dCard===raw?'✓ matches':'✗'}<br>Expiry: <strong>${dExp}</strong> ${dExp===exp?'✓ matches':'✗'}<br>CVV: <strong>${dCvv}</strong> ${dCvv===cvv?'✓ matches':'✗'}<br><span style="color:var(--text3);font-size:10px">Record saved → switch to Simulated Database tab to inspect</span>`,'ok');
+  setStep(5,'done');
+
+  /* ══════ SAVE TO SIMULATED DATABASE ══════ */
+  /* Store the encrypted record in memory (simulates database insert) */
+  dbRecords.push({
+    id:recId++,                     /* Unique record ID */
+    name,                           /* Cardholder name (plaintext) */
+    mask:raw.slice(-4),             /* Last 4 digits (plaintext, for display) */
+    ce:eCard.b64,                   /* Encrypted card number */
+    ee:eExp.b64,                    /* Encrypted expiry date */
+    ve:eCvv.b64,                    /* Encrypted CVV */
+    key                             /* Keep key for decryption (in real system, key is on server) */
+  });
+  renderDB();                         /* Update database table display */
+
+  /* Update status and re-enable button */
+  setChip('enc-status','done','Complete');
+  btn.disabled=false;
+  btn.innerHTML='<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Encrypt Another Card';
+}
+
+/* ══════ DATABASE RENDERING ══════ */
+
+/**
+ * Render the simulated database table
+ * Displays all encrypted card records in a MySQL-style table
+ * Sensitive columns (CardNo, CVV, ExpiryDate) show only Base64 ciphertext
+ * CardMask (last 4 digits) is shown in plaintext for display purposes
+ */
+function renderDB(){
+  const body=document.getElementById('db-body');
+  
+  /* If no records, show the empty state message */
+  if(!dbRecords.length){
+    body.innerHTML='<tr id="db-empty"><td colspan="7" style="text-align:center;color:var(--text3);padding:28px;font-size:13px">No records yet — encrypt a card first</td></tr>';
+    return;
+  }
+  
+  /* Generate HTML for each database record */
+  body.innerHTML=dbRecords.map((r,i)=>`
+    <!-- Row showing encrypted card data -->
+    <tr class="${i===dbRecords.length-1?'row-new':''}">
+      <td><strong>${r.id}</strong></td>                             <!-- CardID: unique identifier -->
+      <td class="td-ok">${r.name}</td>                              <!-- HolderName: stored plaintext -->
+      <td class="td-m">****${r.mask}</td>                            <!-- CardMask: last 4 digits plaintext (for display) -->
+      <td class="td-enc">${r.ce.slice(0,26)}...</td>                <!-- CardNo: Base64-encoded ciphertext (encrypted) -->
+      <td class="td-enc">${r.ee.slice(0,26)}...</td>                <!-- ExpiryDate: Base64-encoded ciphertext (encrypted) -->
+      <td class="td-enc">${r.ve.slice(0,26)}...</td>                <!-- CVV: Base64-encoded ciphertext (encrypted) -->
+      <td><button class="btn btn-sm" onclick="decRow(${i})">Decrypt</button></td>  <!-- Decrypt button reveals plaintext -->
+    </tr>
+    <!-- Hidden row that appears when "Decrypt" is clicked, showing decrypted values -->
+    <tr id="dr-${i}" style="display:none">
+      <td colspan="7" style="background:var(--green-light);padding:12px 14px;font-family:var(--mono);font-size:12px;color:#065f46;border-bottom:2px solid #a7f3d0">
+        <strong>Decrypted:</strong> Card: <span id="dc-${i}"></span> | Expiry: <span id="de-${i}"></span> | CVV: <span id="dv-${i}"></span>
+      </td>
+    </tr>
+  `).join('');
+}
+
+/**
+ * Decrypt and display a single record when "Decrypt" button is clicked
+ * This demonstrates that the encryption is fully reversible with the correct key
+ * 
+ * @param {number} i - Index of the record in dbRecords array
+ */
+async function decRow(i){
+  const r=dbRecords[i];                          /* Get record from database */
+  /* Decrypt each encrypted field and display result */
+  document.getElementById('dc-'+i).textContent=await decField(r.ce,r.key);
+  document.getElementById('de-'+i).textContent=await decField(r.ee,r.key);
+  document.getElementById('dv-'+i).textContent=await decField(r.ve,r.key);
+  /* Toggle visibility of decrypted data row */
+  const row=document.getElementById('dr-'+i);
+  row.style.display=row.style.display==='none'?'':'none';
+}
+
+/**
+ * Clear all records from the simulated database
+ */
+function clearDB(){
+  dbRecords=[];                                   /* Empty the records array */
+  recId=1;                                        /* Reset ID counter */
+  renderDB();                                     /* Re-render table (now empty) */
+}
+
+/* ══════ PASSWORD HASHING (PBKDF2 via Web Crypto) ══════ */
+
+/**
+ * Hash a password using PBKDF2 with bcrypt-scale output formatting
+ * 
+ * Security rationale:
+ * - PBKDF2 is NOT the same as bcrypt, but we use it to demonstrate hashing in the browser
+ * - The cost factor is simulated: we use 2^cost iterations (bcrypt uses 2^cost as well)
+ * - At cost 12 (4096 iterations), this takes ~300ms, making brute-force attacks very expensive
+ * - Random salt is included in the output to prevent rainbow table attacks
+ * - Each password hashes to a DIFFERENT value due to random salt (deterministic hashing would be bad)
+ * 
+ * Output format: $2b$cost$saltBB + hash (mimics bcrypt format for educational purposes)
+ * In production, use actual bcrypt library (bcryptjs for Node.js, bcrypt for Python, etc.)
+ * 
+ * @fires Updates #hash-out element and enables password verification
+ */
+async function hashPassword(){
+  const pw=document.getElementById('pw-input').value;  /* Get password from input */
+  /* Constrain cost factor to valid range (8-14) */
+  const cost=Math.min(14,Math.max(8,parseInt(document.getElementById('pw-cost').value)||10));
+  
+  if(!pw){alert('Enter a password.');return;}
+  
+  const btn=document.getElementById('pw-btn');
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Hashing... (intentionally slow)';
+  
+  const out=document.getElementById('hash-out');
+  out.textContent='Computing...';
+  out.className='hash-box';
+  
+  /* Simulate the time cost: allows us to show how long strong hashing takes */
+  /* At cost 10, minimum time is ~10ms; at cost 12, ~300ms; at cost 14, ~1200ms 
+     This simulates computational expense that makes brute-force attacks impractical */
+  await sleep(Math.min(300*Math.pow(2,cost-10),2500));
+  
+  /* Generate a random 16-byte salt */
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  
+  /* Base64-encode salt and convert to bcrypt-compatible format 
+     (bcrypt uses different Base64 alphabet with . instead of /) */
+  const saltB=btoa(String.fromCharCode(...salt)).slice(0,22).replace(/\+/g,'.').replace(/=/g,'');
+  
+  /* Import password as PBKDF2 key */
+  const km=await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(pw),              /* Password as UTF-8 bytes */
+    "PBKDF2",                                 /* Key derivation algorithm */
+    false,                                      /* Not extractable */
+    ["deriveBits"]                             /* Usage: derive bits */
+  );
+  
+  /* Derive hash bits using PBKDF2 */
+  const der=await crypto.subtle.deriveBits(
+    {
+      name:"PBKDF2",
+      salt,                                     /* Random salt prevents rainbow tables */
+      iterations:Math.pow(2,cost),              /* 2^cost iterations (256 at cost 8, 16384 at cost 14) */
+      hash:"SHA-256"                            /* Strong hash function (256-bit output) */
+    },
+    km,
+    184                                         /* Output: 184 bits (23 bytes) for bcrypt-compat format */
+  );
+  
+  /* Base64-encode hash and convert to bcrypt-compatible format */
+  const hB=btoa(String.fromCharCode(...new Uint8Array(der))).slice(0,31).replace(/\+/g,'.').replace(/=/g,'');
+  
+  /* Assemble final bcrypt-style output */
+  lastHash=`$2b$${String(cost).padStart(2,'0')}$${saltB}${hB}`;
+  lastPw=pw;                                   /* Store password for verification */
+  
+  /* Display hash and enable verification inputs */
+  out.textContent=lastHash;
+  out.className='hash-box has-val';
+  document.getElementById('pw-verify').disabled=false;
+  document.getElementById('verify-btn').disabled=false;
+  document.getElementById('v-result').className='v-result';  /* Clear previous verification result */
+  
+  /* Re-enable button */
+  btn.disabled=false;
+  btn.textContent='Hash Password (Bcrypt-style)';
+}
+
+
+/**
+ * Verify a test password against the stored hash
+ * 
+ * Process:
+ * 1. Extract cost factor and salt from the stored hash
+ * 2. Compute PBKDF2 hash of test password using extracted salt and cost
+ * 3. Compare computed hash with stored hash
+ * 4. Display success or failure message
+ * 
+ * Security note:
+ * In production, use bcrypt.compare() - DO NOT implement comparison yourself
+ * This demo is educational only. String comparison can leak timing information.
+ * 
+ * @fires Updates #v-result element with match/mismatch message
+ */
+async function verifyPw(){
+  if(!lastHash)return;                        /* No hash yet, exit early */
+  
+  const test=document.getElementById('pw-verify').value;  /* Password to test */
+  
+  /* Parse the bcrypt-format hash to extract components */
+  const cost=parseInt(lastHash.split('$')[2]);  /* Extract cost factor (e.g., "10" from $2b$10$...) */
+  const saltStr=lastHash.split('$')[3].slice(0,22);  /* Extract salt from hash */
+  
+  /* Decode salt from bcrypt Base64 format back to bytes */
+  const salt=Uint8Array.from(atob(saltStr.replace(/\./g,'+')),c=>c.charCodeAt(0));
+  
+  /* Import test password as PBKDF2 key */
+  const km=await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(test),            /* Test password as UTF-8 bytes */
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  
+  /* Derive hash bits from test password using same salt and cost as stored hash */
+  const der=await crypto.subtle.deriveBits(
+    {
+      name:"PBKDF2",
+      salt,                                   /* Use the salt extracted from stored hash */
+      iterations:Math.pow(2,cost),            /* Use the cost extracted from stored hash */
+      hash:"SHA-256"
+    },
+    km,
+    184
+  );
+  
+  /* Encode derived hash to bcrypt format */
+  const hB=btoa(String.fromCharCode(...new Uint8Array(der))).slice(0,31).replace(/\+/g,'.').replace(/=/g,'');
+  
+  /* Reconstruct the full bcrypt-format hash from test password */
+  const match=`$2b$${String(cost).padStart(2,'0')}$${saltStr}${hB}`===lastHash;
+  
+  /* Display result */
+  const r=document.getElementById('v-result');
+  r.className='v-result show '+(match?'v-ok':'v-fail');  /* Apply appropriate CSS class */
+  r.innerHTML=match?'✓ Password matches':'✗ Wrong password';  /* Show message */
+}
+
+/* ══════ UTILITY FUNCTIONS ══════ */
+
+/**
+ * Switch between tabs in the navigation
+ * Hides current tab and shows the selected tab's content
+ * 
+ * @param {string} id - Tab ID to show (e.g., 'enc', 'pw', 'db', 'info')
+ * @param {HTMLElement} el - The clicked tab button element
+ */
+function sw(id,el){
+  /* Remove 'on' class from all tabs to visually deactivate them */
+  document.querySelectorAll('.tab').forEach(t=>t.className='tab');
+  /* Add 'on' class to clicked tab to activate it visually */
+  el.className='tab on';
+  
+  /* Hide all panels by removing 'on' class */
+  document.querySelectorAll('.panel').forEach(p=>p.className='panel');
+  /* Show selected panel by adding 'on' class */
+  document.getElementById('tab-'+id).className='panel on';
+}
+
+/**
+ * Format card number input with spaces every 4 digits
+ * Removes non-digits and applies formatting: "4532015112830366" -> "4532 0151 1283 0366"
+ * Max length is enforced to 19 characters (16 digits + 3 spaces)
+ * 
+ * @param {HTMLInputElement} el - The card number input element
+ */
+function fmtCard(el){
+  /* Remove all non-digit characters */
+  let v=el.value.replace(/\D/g,'').slice(0,16);  /* Keep only digits, max 16 */
+  /* Add space after every 4 digits */
+  el.value=v.replace(/(.{4})/g,'$1 ').trim();    /* Regex: replace every 4 chars with "4chars ", trim trailing space */
+}
+</script>
+</body>
+</html>
